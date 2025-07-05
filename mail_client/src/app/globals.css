@@ -1,3 +1,108 @@
 @import "tailwindcss";
 
+.editor-content {
+  outline: none !important; /* Remove default browser focus outline */
+  box-shadow: none !important; /* Ensure no box-shadow is causing a border */
+  min-height: 150px; /* Adjust as needed */
+  padding: 1rem;
+  line-height: 1.5;
+  font-size: 1rem; /* Default size if no font size is applied */
+  color: #333; /* Default text color */
+  cursor: text;
+  flex-grow: 1; /* Allows content area to expand */
+  overflow-y: auto; /* Enable scrolling if content overflows */
+}
 
+/* Basic Styling for elements created by execCommand */
+.editor-content b, .editor-content strong { font-weight: bold; }
+.editor-content i, .editor-content em { font-style: italic; }
+.editor-content u { text-decoration: underline; }
+
+.editor-content ul {
+  list-style-type: disc;
+  margin-left: 1.5rem; /* Indent bullets */
+  padding-left: 0;
+}
+
+.editor-content ol {
+  list-style-type: decimal;
+  margin-left: 1.5rem; /* Indent numbers */
+  padding-left: 0;
+}
+
+.editor-content li {
+  margin-bottom: 0.25rem;
+}
+
+.editor-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.editor-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.5rem auto;
+}
+
+/* Font Size Mapping for execCommand's <font size="X"> */
+/* These map the execCommand sizes (1-7) to approximate pixel sizes */
+.editor-content font[size="1"] { font-size: 10px; }
+.editor-content font[size="2"] { font-size: 12px; }
+.editor-content font[size="3"] { font-size: 14px; } /* Often browser default */
+.editor-content font[size="4"] { font-size: 18px; }
+.editor-content font[size="5"] { font-size: 24px; }
+.editor-content font[size="6"] { font-size: 32px; }
+.editor-content font[size="7"] { font-size: 48px; }
+
+/* Font Family Mapping for execCommand's <font face="X"> */
+.editor-content font[face="Arial"] { font-family: Arial, sans-serif; }
+.editor-content font[face="Courier New"] { font-family: "Courier New", monospace; }
+.editor-content font[face="Georgia"] { font-family: Georgia, serif; }
+.editor-content font[face="Times New Roman"] { font-family: "Times New Roman", serif; }
+.editor-content font[face="Verdana"] { font-family: Verdana, sans-serif; }
+.editor-content font[face="Tahoma"] { font-family: Tahoma, sans-serif; }
+
+
+/* Your custom animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+@keyframes rotate360 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-rotate360 {
+  animation: rotate360 6s linear infinite;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.2s ease-out forwards;
+}

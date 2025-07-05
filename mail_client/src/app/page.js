@@ -1,30 +1,33 @@
+// my-email-frontend/app/page.js
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiClient from './api/client';
 import { useAuth } from './hooks/useAuth';
 
-// Import Components
 import AuthForm from './components/AuthForm';
 import Layout from './components/Layout';
-import ComposeForm from './components/ComposeForm';
 import EmailList from './components/EmailList';
+
+import dynamic from 'next/dynamic';
+const DynamicComposeForm = dynamic(() => import('./components/ComposeForm'), { ssr: false });
+
 
 export default function Home() {
   const { isLoggedIn, userEmail, authMessage, login, register, logout, setAuthMessage } = useAuth();
 
-  const [inboxEmails, setInboxEmails] = useState([]);
+  const [allInboxEmails, setAllInboxEmails] = useState([]);
   const [sentEmails, setSentEmails] = useState([]);
-  const [activeTab, setActiveTab] = useState('inbox'); // 'inbox', 'sent', 'compose'
-  const [appMessage, setAppMessage] = useState(''); // Messages for email operations
+  const [activeTab, setActiveTab] = useState('inbox');
+  const [activeInboxCategory, setActiveInboxCategory] = useState('Primary'); // Default to Primary
+  const [appMessage, setAppMessage] = useState('');
 
   useEffect(() => {
     if (isLoggedIn) {
-      // Pass token implicitly via apiClient interceptor now
-      fetchEmails('inbox');
+      fetchEmails('inbox'); // Fetch all inbox emails
       fetchEmails('sent');
     } else {
-      setInboxEmails([]);
+      setAllInboxEmails([]);
       setSentEmails([]);
     }
   }, [isLoggedIn]);
@@ -49,6 +52,7 @@ export default function Home() {
       setAppMessage("Login successful! Loading emails...");
     }
   };
+
   const handleRegister = async (name, email, password, confirmPassword) => {
     const result = await register(name, email, password, confirmPassword);
     if (result.success) {
@@ -60,7 +64,7 @@ export default function Home() {
     try {
       const res = await apiClient.get(`/api/emails?type=${type}`);
       if (type === 'inbox') {
-        setInboxEmails(res.data);
+        setAllInboxEmails(res.data);
       } else {
         setSentEmails(res.data);
       }
@@ -70,9 +74,22 @@ export default function Home() {
     }
   };
 
-  const handleSendEmail = async (to, subject, body) => {
+  const handleSendEmail = async (to, subject, bodyHtml, attachments) => {
     try {
-      const res = await apiClient.post('/api/send-email', { to, subject, body });
+      const formData = new FormData();
+      formData.append('to', to);
+      formData.append('subject', subject);
+      formData.append('bodyHtml', bodyHtml);
+
+      attachments.forEach((file, index) => {
+        formData.append(`attachments[${index}]`, file);
+      });
+
+      const res = await apiClient.post('/api/send-email', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       setAppMessage(res.data.message);
       fetchEmails('sent');
       setActiveTab('sent');
@@ -83,11 +100,30 @@ export default function Home() {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
+
+  // This handler will be passed to EmailList
+  const handleInboxCategoryChange = (category) => {
+    setActiveInboxCategory(category);
+    setActiveTab('inbox'); // Ensure inbox tab is active when a category is selected
+  };
+
+  // Memoized filtered inbox emails based on activeInboxCategory
+  const filteredInboxEmails = useMemo(() => {
+    if (activeInboxCategory === 'all') {
+      return allInboxEmails;
+    }
+    return allInboxEmails.filter(mail => (mail.category || 'Primary') === activeInboxCategory);
+  }, [allInboxEmails, activeInboxCategory]);
+
+
   if (!isLoggedIn) {
     return (
       <AuthForm
         onLogin={handleLogin}
-        onRegister={handleRegister} 
+        onRegister={handleRegister}
         message={authMessage}
       />
     );
@@ -98,14 +134,14 @@ export default function Home() {
       userEmail={userEmail}
       onLogout={logout}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
-      inboxCount={inboxEmails.length}
+      onTabChange={handleTabChange}
+      inboxCount={allInboxEmails.length} // Layout shows total inbox count
       sentCount={sentEmails.length}
     >
       {appMessage && <p className="mb-4 text-center text-green-600">{appMessage}</p>}
 
       {activeTab === 'compose' && (
-        <ComposeForm
+        <DynamicComposeForm
           onSendEmail={handleSendEmail}
           message={appMessage}
         />
@@ -113,8 +149,10 @@ export default function Home() {
 
       {activeTab === 'inbox' && (
         <EmailList
-          emails={inboxEmails}
+          emails={filteredInboxEmails} // Pass filtered emails
           type="inbox"
+          activeInboxCategory={activeInboxCategory} // Pass active category
+          onInboxCategoryChange={handleInboxCategoryChange} // Pass handler
         />
       )}
 

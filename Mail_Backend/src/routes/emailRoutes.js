@@ -1,16 +1,27 @@
+// my-email-backend/src/routes/emailRoutes.js
 const express = require('express');
 const axios = require('axios');
 const authenticateToken = require('../middleware/authMiddleware');
 const User = require('../models/userModel');
+const mailparser = require('mailparser');
+const multer = require('multer'); // Import multer
 
 const router = express.Router();
 
-// Route to send email
-router.post('/send-email', authenticateToken, async (req, res) => {
-    const { to, subject, body } = req.body;
+// Configure multer for file uploads
+// Using memory storage for simplicity; for production, consider disk storage or cloud storage
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Route to send email - NOW HANDLES FILE UPLOADS
+// Use upload.array('attachments') middleware to process multiple files
+router.post('/send-email', authenticateToken, upload.array('attachments'), async (req, res) => {
+    // req.body will contain text fields
+    // req.files will contain the uploaded files
+    const { to, subject, bodyHtml } = req.body;
     const from = req.user.email;
 
-    if (!to || !subject || !body) {
+    // Ensure all required fields are present
+    if (!to || !subject || !bodyHtml) {
         return res.status(400).json({ message: 'To, Subject, and Body are required.' });
     }
 
@@ -23,26 +34,38 @@ router.post('/send-email', authenticateToken, async (req, res) => {
     }
 
     try {
+        const recipientsArray = to.split(',').map(email => email.trim()).filter(email => email);
+
+        // Prepare attachments for Postal API
+        const attachmentsForPostal = req.files ? req.files.map(file => ({
+            filename: file.originalname,
+            content: file.buffer.toString('base64'), // Postal expects base64 content
+            encoding: 'base64',
+            mimetype: file.mimetype,
+        })) : [];
+
         const response = await axios.post(
             postalApiUrl,
             {
-                to: [to], 
+                to: recipientsArray,
                 from: from,
                 subject: subject,
-                plain_body: body,
-              
+                html_body: bodyHtml,
+                attachments: attachmentsForPostal, // Include attachments here
             },
             {
                 headers: {
-                    'X-Server-API-Key': postalApiKey, 
-                    'Content-Type': 'application/json'
+                    'X-Server-API-Key': postalApiKey,
+                    'Content-Type': 'application/json' // Axios will handle this for FormData
                 }
             }
         );
 
         console.log('Email sent via Postal:', response.data);
 
-        await User.addSentEmail(req.user.id, from, [to], subject, body);
+        // Store sent email in your database.
+        // You might want to store attachment metadata (names, sizes) here too.
+        await User.addSentEmail(req.user.id, from, recipientsArray, subject, bodyHtml);
 
         res.status(200).json({ message: 'Email sent and stored!', postalResponse: response.data });
 
@@ -52,30 +75,48 @@ router.post('/send-email', authenticateToken, async (req, res) => {
     }
 });
 
-// Webhook for inbound emails from Postal
+// Webhook for inbound emails from Postal (remains mostly the same)
 router.post('/webhooks/postal/inbound', async (req, res) => {
     console.log('Received inbound email webhook:', JSON.stringify(req.body, null, 2));
 
-    const emailData = req.body.message; 
+    const emailData = req.body.message;
     if (!emailData) {
-        return res.status(400).json({ message: 'No message data found in webhook body.' });
+        // If Postal sends raw email (text/plain), parse it
+        if (typeof req.body === 'string' && req.body.startsWith('Received:')) {
+            try {
+                const parsedEmail = await mailparser.simpleParser(req.body);
+                emailData = {
+                    to: { email: parsedEmail.to?.value[0]?.address || parsedEmail.to?.text },
+                    from: { email: parsedEmail.from?.value[0]?.address || parsedEmail.from?.text },
+                    subject: parsedEmail.subject,
+                    plain_body: parsedEmail.text,
+                    html_body: parsedEmail.html,
+                };
+                console.log('Parsed raw email:', emailData);
+            } catch (parseError) {
+                console.error('Error parsing raw email from webhook:', parseError);
+                return res.status(400).json({ message: 'Failed to parse raw email body.' });
+            }
+        } else {
+             return res.status(400).json({ message: 'No message data found in webhook body.' });
+        }
     }
 
-    const recipientEmail = emailData.to.email; 
+    const recipientEmail = emailData.to.email;
     const senderEmail = emailData.from.email;
     const subject = emailData.subject;
     const plainBody = emailData.plain_body;
+    const htmlBody = emailData.html_body;
 
     try {
-       
         const user = await User.findByEmail(recipientEmail);
         if (user) {
-            await User.addReceivedEmail(user.id, senderEmail, [recipientEmail], subject, plainBody);
+            await User.addReceivedEmail(user.id, senderEmail, [recipientEmail], subject, plainBody, htmlBody);
             console.log(`Inbound email for user ${user.email} stored.`);
             res.status(200).json({ message: 'Inbound email received and stored.' });
         } else {
             console.log(`No user found for inbound email recipient: ${recipientEmail}`);
-            res.status(404).json({ message: 'Recipient user not found in database.' });
+            res.status(200).json({ message: 'Recipient user not found, email not stored (expected behavior for unknown users).' });
         }
     } catch (error) {
         console.error('Error processing inbound email webhook:', error);
@@ -83,8 +124,10 @@ router.post('/webhooks/postal/inbound', async (req, res) => {
     }
 });
 
+
+// Route to fetch sent or inbox emails (remains the same)
 router.get('/emails', authenticateToken, async (req, res) => {
-    const { type } = req.query; 
+    const { type } = req.query;
 
     try {
         let emails;
