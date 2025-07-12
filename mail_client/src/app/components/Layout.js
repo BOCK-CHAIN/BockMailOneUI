@@ -2,20 +2,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
-import { Pencil, Inbox, SendHorizontal, LogOut, User } from "lucide-react"; // Removed Tag, Users icons
+import { Menu, X, Pencil, Inbox, SendHorizontal, LogOut, User, FileText, Ban, Trash2, Clock, ChevronDown, ChevronUp } from "lucide-react"; // Added ChevronDown, ChevronUp icons
 
 export default function Layout({
   userEmail,
   onLogout,
   activeTab,
   onTabChange,
-  inboxCount, // Still pass total inbox count for sidebar
+  inboxCount,
   sentCount,
+  onMinimizeCompose, // Function to minimize compose window
   children,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false); // New state for 'More' section
   const profileDropdownRef = useRef(null);
 
   const toggleProfileDropdown = () => {
@@ -34,6 +35,23 @@ export default function Layout({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Handler for mobile menu button
+  const handleMobileMenuToggle = () => {
+    if (!sidebarOpen) {
+      onMinimizeCompose(); // Minimize compose window when mobile menu opens
+    }
+    setSidebarOpen(!sidebarOpen); // Toggle the sidebar state
+  };
+
+  // Helper to handle tab change and close sidebar if on mobile
+  const handleTabChangeAndCloseSidebar = (tab) => {
+    onTabChange(tab);
+    setSidebarOpen(false); // Close sidebar on mobile after tab selection
+  };
+
+  // Determine if any of the "More" tabs are active
+  const isAnyMoreTabActive = ['drafts', 'scheduled', 'spam', 'trash'].includes(activeTab);
 
   return (
     <div className="flex min-h-screen bg-[#F6F0F8]">
@@ -64,10 +82,7 @@ export default function Layout({
         {/* Sidebar Buttons */}
         <nav className="mt-6 flex flex-col gap-3">
           <button
-            onClick={() => {
-              onTabChange("compose");
-              setSidebarOpen(false);
-            }}
+            onClick={() => handleTabChangeAndCloseSidebar("compose")}
             className={`px-8 py-4 w-[60%] text-left rounded-2xl text-sm font-medium transition-all focus:outline-none focus:ring-2  ${
               activeTab === "compose"
                 ? "bg-purple-600 text-white"
@@ -75,19 +90,14 @@ export default function Layout({
             }`}
           >
             <div className="logo flex justify-center items-center gap-2">
-              <p>
-                <Pencil width={20} height={20} />
-              </p>
+             <p> <Pencil width={20} height={20} /></p>
               <p>Compose</p>
             </div>
           </button>
 
-          {/* Inbox Button (no categories here) */}
+          {/* Inbox Button */}
           <button
-            onClick={() => {
-              onTabChange("inbox");
-              setSidebarOpen(false);
-            }}
+            onClick={() => handleTabChangeAndCloseSidebar("inbox")}
             className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
               activeTab === "inbox"
                 ? "bg-purple-600 text-white"
@@ -95,18 +105,14 @@ export default function Layout({
             }`}
           >
             <div className="logo flex justify-center items-center gap-2">
-              <p>
-                <Inbox size={20} />
-              </p>
-              <p>Inbox ({inboxCount})</p>
+              <Inbox size={20} />
+              <span>Inbox ({inboxCount})</span>
             </div>
           </button>
 
+          {/* Sent Button */}
           <button
-            onClick={() => {
-              onTabChange("sent");
-              setSidebarOpen(false);
-            }}
+            onClick={() => handleTabChangeAndCloseSidebar("sent")}
             className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
               activeTab === "sent"
                 ? "bg-purple-600 text-white"
@@ -114,12 +120,90 @@ export default function Layout({
             }`}
           >
             <div className="logo flex justify-center items-center gap-2">
-              <p>
-                <SendHorizontal width={20} height={20} />
-              </p>
-              <p>Sent ({sentCount})</p>
+              <SendHorizontal width={20} height={20} />
+              <span>Sent ({sentCount})</span>
             </div>
           </button>
+
+          {/* "More" button to toggle additional options */}
+          <button
+            onClick={() => setShowMoreOptions(!showMoreOptions)}
+            className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+              showMoreOptions || isAnyMoreTabActive // Active if expanded OR any "More" tab is active
+                ? "bg-purple-600 text-white"
+                : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+            }`}
+          >
+            <div className="logo flex justify-center items-center gap-2">
+              {showMoreOptions ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              <span>More</span>
+            </div>
+          </button>
+
+          {/* Additional options, conditionally rendered */}
+          {showMoreOptions && (
+            <div className="flex flex-col gap-3 pl-4"> {/* Indent these options */}
+              {/* Drafts Button */}
+              <button
+                onClick={() => handleTabChangeAndCloseSidebar("drafts")}
+                className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+                  activeTab === "drafts"
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+                }`}
+              >
+                <div className="logo flex justify-center items-center gap-2">
+                  <FileText size={20} />
+                  <span>Drafts</span>
+                </div>
+              </button>
+
+              {/* Scheduled Button */}
+              <button
+                onClick={() => handleTabChangeAndCloseSidebar("scheduled")}
+                className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+                  activeTab === "scheduled"
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+                }`}
+              >
+                <div className="logo flex justify-center items-center gap-2">
+                  <Clock size={20} />
+                  <span>Scheduled</span>
+                </div>
+              </button>
+
+              {/* Spam Button */}
+              <button
+                onClick={() => handleTabChangeAndCloseSidebar("spam")}
+                className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+                  activeTab === "spam"
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+                }`}
+              >
+                <div className="logo flex justify-center items-center gap-2">
+                  <Ban size={20} />
+                  <span>Spam</span>
+                </div>
+              </button>
+
+              {/* Trash Button */}
+              <button
+                onClick={() => handleTabChangeAndCloseSidebar("trash")}
+                className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+                  activeTab === "trash"
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+                }`}
+              >
+                <div className="logo flex justify-center items-center gap-2">
+                  <Trash2 size={20} />
+                  <span>Trash</span>
+                </div>
+              </button>
+            </div>
+          )}
         </nav>
       </aside>
 
@@ -138,7 +222,7 @@ export default function Layout({
           {/* Left Side - Menu & Search */}
           <div className="flex items-center gap-3 flex-1">
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={handleMobileMenuToggle}
               className="text-gray-700 focus:outline-none"
             >
               {sidebarOpen ? <X size={24} /> : <Menu size={24} />}

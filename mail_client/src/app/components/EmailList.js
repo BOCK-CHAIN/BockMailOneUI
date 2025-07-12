@@ -1,8 +1,10 @@
 // my-email-frontend/app/components/EmailList.js
-import React from 'react';
-import { Inbox, Tag, Users } from 'lucide-react'; // Import icons
+'use client'; // Ensure this is present for client-side interactivity
 
-export default function EmailList({ emails, type, activeInboxCategory, onInboxCategoryChange }) { // Added new props
+import React from 'react';
+import { Inbox, Tag, Users, Trash2 } from 'lucide-react'; // Import Trash2 icon
+
+export default function EmailList({ emails, type, activeInboxCategory, onInboxCategoryChange, onMoveEmailToTrash }) {
   const isSent = type === 'sent';
   const title = isSent ? 'Sent Mail' : 'Inbox';
 
@@ -12,15 +14,36 @@ export default function EmailList({ emails, type, activeInboxCategory, onInboxCa
     { name: 'Primary', icon: Inbox },
     { name: 'Promotions', icon: Tag },
     { name: 'Social', icon: Users },
+    { name: 'all', label: 'All Mail' } // Added 'all' category for consistency
   ];
+
+  const getCategoryName = (category) => {
+    switch (category) {
+      case 'Primary': return 'Primary';
+      case 'Social': return 'Social';
+      case 'Promotions': return 'Promotions';
+      case 'Updates': return 'Updates';
+      case 'all': return 'All Mail'; // Label for 'all' category
+      default: return 'Other';
+    }
+  };
+
+  const getSenderOrRecipient = (email) => {
+    if (type === 'inbox') {
+      return email.sender;
+    } else if (type === 'sent') {
+      return Array.isArray(email.recipients) ? email.recipients.join(', ') : email.recipients;
+    }
+    return '';
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md mb-6 overflow-hidden">
-      {/* Conditional Category Tabs for Inbox */}
+      {/* Conditional Category Tabs for Inbox - ALWAYS RENDERED IF INBOX */}
       {isInbox && (
         <div className="flex border-b border-gray-200 bg-gray-50">
           {categories.map((category) => {
-            const Icon = category.icon; // Get the icon component
+            const Icon = category.icon; // Icon might be undefined for 'all'
             return (
               <button
                 key={category.name}
@@ -32,22 +55,23 @@ export default function EmailList({ emails, type, activeInboxCategory, onInboxCa
                               : 'text-gray-700'
                             }`}
               >
-                <Icon size={18} /> {category.name}
+                {Icon && <Icon size={18} />} {category.label || category.name}
               </button>
             );
           })}
         </div>
       )}
 
-      {/* Main Title (only if not inbox, or as a secondary title) */}
+      {/* Main Title (only if not inbox) */}
       {!isInbox && (
         <h2 className="text-2xl font-semibold border-b pb-4 mb-0 px-6 py-4 text-gray-800 bg-gray-50">
           {title}
         </h2>
       )}
       
+      {/* Conditional rendering for email list or "No messages" */}
       {emails.length === 0 ? (
-        <p className="text-gray-600 p-6">No messages in {isInbox ? activeInboxCategory : type} {type === 'sent' ? 'mail' : 'inbox'}.</p>
+        <p className="text-gray-600 p-6">No messages in {isInbox ? getCategoryName(activeInboxCategory) : type} {type === 'sent' ? 'mail' : 'inbox'}.</p>
       ) : (
         <ul className="list-none p-0 divide-y divide-gray-200">
           {emails.map((mail) => (
@@ -58,7 +82,7 @@ export default function EmailList({ emails, type, activeInboxCategory, onInboxCa
               <div className="flex justify-between items-center">
                 <div className="flex-grow flex items-baseline overflow-hidden">
                   <span className="font-semibold text-gray-900 text-base whitespace-nowrap overflow-hidden text-ellipsis mr-2">
-                    {isSent ? `To: ${mail.recipients.join(', ')}` : `From: ${mail.sender}`}
+                    {isSent ? `To: ${getSenderOrRecipient(mail)}` : `From: ${getSenderOrRecipient(mail)}`}
                   </span>
                   <span className="text-gray-800 text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                     {mail.subject || '(No Subject)'}
@@ -68,6 +92,16 @@ export default function EmailList({ emails, type, activeInboxCategory, onInboxCa
                       </span>
                     )}
                   </span>
+                </div>
+                {/* Delete Button (Move to Trash) */}
+                <div className="flex-shrink-0 ml-4">
+                  <button
+                    onClick={() => onMoveEmailToTrash(mail.id)}
+                    className="p-2 rounded-full text-red-600 hover:bg-red-100 transition-colors"
+                    title="Move to Trash"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
             </li>
