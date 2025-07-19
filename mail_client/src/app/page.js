@@ -9,7 +9,8 @@ import AuthForm from './components/AuthForm';
 import Layout from './components/Layout';
 import EmailList from './components/EmailList';
 import DraftList from './components/DraftList';
-import TrashList from './components/TrashList'; // NEW: Import TrashList
+import TrashList from './components/TrashList';
+import StarredList from './components/StarredList'; // NEW: Import StarredList
 
 import dynamic from 'next/dynamic';
 const DynamicComposeForm = dynamic(() => import('./components/ComposeForm'), { ssr: false });
@@ -31,10 +32,13 @@ export default function Home() {
 
   // STATES FOR DRAFTS
   const [drafts, setDrafts] = useState([]);
-  const [selectedDraft, setSelectedDraft] = useState(null); // Holds the draft object being edited
+  const [selectedDraft, setSelectedDraft] = useState(null);
 
-  // NEW STATE FOR TRASH
+  // STATE FOR TRASH
   const [trashedItems, setTrashedItems] = useState([]);
+
+  // NEW STATE FOR STARRED ITEMS
+  const [starredItems, setStarredItems] = useState([]);
 
 
   useEffect(() => {
@@ -42,12 +46,14 @@ export default function Home() {
       fetchEmails('inbox');
       fetchEmails('sent');
       fetchDrafts();
-      fetchTrashedItems(); // NEW: Fetch trashed items on login
+      fetchTrashedItems();
+      fetchStarredItems(); // NEW: Fetch starred items on login
     } else {
       setAllInboxEmails([]);
       setSentEmails([]);
       setDrafts([]);
-      setTrashedItems([]); // NEW: Clear trashed items on logout
+      setTrashedItems([]);
+      setStarredItems([]); // NEW: Clear starred items on logout
     }
   }, [isLoggedIn]);
 
@@ -104,7 +110,7 @@ export default function Home() {
     }
   };
 
-  // NEW: Fetch Trashed Items
+  // Fetch Trashed Items
   const fetchTrashedItems = async () => {
     try {
       const res = await apiClient.get('/api/trash');
@@ -112,6 +118,17 @@ export default function Home() {
     } catch (err) {
       console.error('Failed to fetch trashed items:', err);
       setAppMessage('Failed to fetch trashed items.');
+    }
+  };
+
+  // NEW: Fetch Starred Items
+  const fetchStarredItems = async () => {
+    try {
+      const res = await apiClient.get('/api/starred');
+      setStarredItems(res.data);
+    } catch (err) {
+      console.error('Failed to fetch starred items:', err);
+      setAppMessage('Failed to fetch starred items.');
     }
   };
 
@@ -123,7 +140,6 @@ export default function Home() {
       formData.append('subject', subject);
       formData.append('bodyHtml', bodyHtml);
       
-      // Append draftIdToClear if available
       if (draftIdToClear) {
         formData.append('draftIdToClear', draftIdToClear);
       }
@@ -136,7 +152,7 @@ export default function Home() {
       }
 
       attachments.forEach((file, index) => {
-        formData.append(`attachments[${index}]`, file.fileObject); // Use fileObject for actual upload
+        formData.append(`attachments[${index}]`, file.fileObject);
       });
 
       const res = await apiClient.post('/api/send-email', formData, {
@@ -148,13 +164,14 @@ export default function Home() {
         setAppMessage(res.data.message);
       }
       fetchEmails('sent');
-      fetchDrafts(); // Re-fetch drafts after sending (in case one was cleared)
-      fetchTrashedItems(); // NEW: Re-fetch trashed items (if a draft was moved to trash)
+      fetchDrafts();
+      fetchTrashedItems();
+      fetchStarredItems(); // NEW: Re-fetch starred items after sending (if a starred draft was sent)
       setActiveTab('sent');
       setShowComposeWindow(false);
       setIsComposeMinimized(false);
       setIsComposeMaximized(false);
-      setSelectedDraft(null); // Clear selected draft after sending
+      setSelectedDraft(null);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to send email!';
       setAppMessage(msg);
@@ -166,17 +183,17 @@ export default function Home() {
     setActiveTab(tab);
     if (tab === 'compose') {
       setShowComposeWindow(true);
-      setIsComposeMinimized(false); // Ensure it's not minimized when opened
-      setIsComposeMaximized(false); // Ensure it's not maximized when opened
-      setSelectedDraft(null); // Clear selected draft when starting a new compose
+      setIsComposeMinimized(false);
+      setIsComposeMaximized(false);
+      setSelectedDraft(null);
     }
-    // The compose window will now only close when its 'X' button is clicked,
-    // or when an email is sent from it.
     
     if (tab === 'drafts') {
       fetchDrafts();
-    } else if (tab === 'trash') { // NEW: Fetch trashed items when trash tab is opened
+    } else if (tab === 'trash') {
       fetchTrashedItems();
+    } else if (tab === 'starred') { // NEW: Fetch starred items when starred tab is opened
+      fetchStarredItems();
     }
   };
 
@@ -210,22 +227,21 @@ export default function Home() {
     setShowComposeWindow(true);
     setIsComposeMinimized(false);
     setIsComposeMaximized(false);
-    setActiveTab('compose'); // Set active tab to compose when editing a draft
+    setActiveTab('compose');
   };
 
-  // NEW: Function to move an email (inbox/sent) or draft to trash
+  // Function to move an email (inbox/sent) or draft to trash
   const handleMoveToTrash = async (itemType, itemId, emailType = null) => {
     try {
       if (itemType === 'draft') {
         await apiClient.post('/api/trash/draft', { draftId: itemId });
         setAppMessage('Draft moved to trash!');
-        fetchDrafts(); // Re-fetch drafts to remove it from the list
-        // If the trashed draft was the one being edited, close compose form
+        fetchDrafts();
         if (selectedDraft && selectedDraft.id === itemId) {
           setShowComposeWindow(false);
           setSelectedDraft(null);
         }
-      } else if (itemType === 'email') {
+      } else if (itemType === 'inbox' || itemType === 'sent') {
         if (!emailType) {
           console.error("emailType (sent/inbox) is required for moving email to trash.");
           setAppMessage("Error: Email type missing for trash.");
@@ -233,23 +249,24 @@ export default function Home() {
         }
         await apiClient.post('/api/trash/email', { emailId: itemId, emailType: emailType });
         setAppMessage('Email moved to trash!');
-        fetchEmails('inbox'); // Re-fetch inbox and sent to remove it from there
+        fetchEmails('inbox');
         fetchEmails('sent');
       }
-      fetchTrashedItems(); // Always re-fetch trash list
+      fetchTrashedItems();
+      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was trashed)
     } catch (err) {
       console.error(`Failed to move ${itemType} to trash:`, err);
       setAppMessage(`Failed to move ${itemType} to trash.`);
     }
   };
 
-  // NEW: Function to permanently delete an item from trash
+  // Function to permanently delete an item from trash
   const handlePermanentDelete = async (itemType, itemId, emailType = null) => {
     try {
       if (itemType === 'draft') {
         await apiClient.delete(`/api/trash/drafts/${itemId}`);
         setAppMessage('Draft permanently deleted!');
-      } else if (itemType === 'email') {
+      } else if (itemType === 'inbox' || itemType === 'sent') {
         if (!emailType) {
           console.error("emailType (sent/inbox) is required for permanent email deletion.");
           setAppMessage("Error: Email type missing for permanent delete.");
@@ -258,26 +275,23 @@ export default function Home() {
         await apiClient.delete(`/api/trash/emails/${itemId}?type=${emailType}`);
         setAppMessage('Email permanently deleted!');
       }
-      fetchTrashedItems(); // Re-fetch trash list
+      fetchTrashedItems();
+      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was permanently deleted from trash)
     } catch (err) {
       console.error(`Failed to permanently delete ${itemType}:`, err);
       setAppMessage(`Failed to permanently delete ${itemType}.`);
     }
   };
 
-  // NEW: Function to restore an item from trash
+  // Function to restore an item from trash
   const handleRestoreFromTrash = async (itemType, itemId, originalFolder = null) => {
     try {
       if (itemType === 'draft') {
-        // For drafts, we can just save it again with is_trashed=FALSE
-        // Or, if your backend has a dedicated restore endpoint, use that.
-        // For now, we'll assume saving a draft automatically untrashes it.
-        // Or, we can create a specific endpoint for restoring.
-        // Let's make a dedicated restore endpoint for clarity.
         await apiClient.post('/api/trash/restore/draft', { draftId: itemId });
         setAppMessage('Draft restored from trash!');
-        fetchDrafts(); // Re-fetch drafts to show it there
-      } else if (itemType === 'email') {
+        fetchDrafts();
+      } else if (itemType === 'inbox' || itemType === 'sent') {
+        console.log('Restoring email from trash...');
         if (!originalFolder) {
           console.error("Original folder (sent/inbox) is required for restoring email.");
           setAppMessage("Error: Original folder missing for restore.");
@@ -285,13 +299,46 @@ export default function Home() {
         }
         await apiClient.post('/api/trash/restore/email', { emailId: itemId, originalFolder: originalFolder });
         setAppMessage('Email restored from trash!');
-        fetchEmails('inbox'); // Re-fetch inbox and sent
+        fetchEmails('inbox');
         fetchEmails('sent');
       }
-      fetchTrashedItems(); // Re-fetch trash list
+      fetchTrashedItems();
+      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was restored)
     } catch (err) {
       console.error(`Failed to restore ${itemType} from trash:`, err);
       setAppMessage(`Failed to restore ${itemType} from trash.`);
+    }
+  };
+
+  // NEW: Function to toggle starred status for any item type
+  const handleToggleStarred = async (itemType, itemId, currentStarredStatus, emailType = null) => {
+    try {
+      const newStarredStatus = !currentStarredStatus;
+      let result;
+
+      if (itemType === 'draft') {
+        result = await apiClient.patch('/api/starred/draft', { draftId: itemId, isStarred: newStarredStatus });
+        setAppMessage(`Draft ${newStarredStatus ? 'starred' : 'unstarred'}!`);
+        fetchDrafts(); // Re-fetch drafts to update their starred status
+      } else if (itemType === 'inbox' || itemType === 'sent') {
+        if (!emailType) {
+          console.error("Email type (sent/inbox) is required for toggling starred status.");
+          setAppMessage("Error: Email type missing for star toggle.");
+          return;
+        }
+        result = await apiClient.patch('/api/starred/email', { emailId: itemId, emailType: emailType, isStarred: newStarredStatus });
+        setAppMessage(`Email ${newStarredStatus ? 'starred' : 'unstarred'}!`);
+        fetchEmails('inbox'); // Re-fetch emails to update their starred status
+        fetchEmails('sent');
+      } else {
+        console.error("Invalid item type for toggling starred status.");
+        setAppMessage("Error: Invalid item type for star toggle.");
+        return;
+      }
+      fetchStarredItems(); // Always re-fetch starred items to update the starred list
+    } catch (err) {
+      console.error(`Failed to toggle starred status for ${itemType}:`, err);
+      setAppMessage(`Failed to toggle starred status for ${itemType}.`);
     }
   };
 
@@ -331,7 +378,6 @@ export default function Home() {
     >
       {appMessage && <p className="mb-4 text-center text-green-600">{appMessage}</p>}
 
-      {/* Conditionally render the floating ComposeForm */}
       {showComposeWindow && (
         <DynamicComposeForm
           onSendEmail={handleSendEmail}
@@ -343,11 +389,12 @@ export default function Home() {
           isMaximized={isComposeMaximized}
           initialDraft={selectedDraft}
           onDraftSaved={fetchDrafts}
-          onMoveDraftToTrash={(draftIdToTrash) => { // NEW: Pass handler for ComposeForm's delete
-            handleMoveToTrash('draft', draftIdToTrash);
-            setShowComposeWindow(false); // Close compose form after moving to trash
+          onMoveDraftToTrash={(draftIdToTrash) => {
+            handleMoveToTrash('draft', draftIdToClear);
+            setShowComposeWindow(false);
             setSelectedDraft(null);
           }}
+          onToggleStarred={handleToggleStarred} // NEW: Pass star toggle handler
         />
       )}
 
@@ -355,7 +402,8 @@ export default function Home() {
         <EmailList
           emails={filteredInboxEmails}
           type="inbox"
-          onMoveEmailToTrash={(emailId) => handleMoveToTrash('email', emailId, 'inbox')} // NEW: Pass handler
+          onMoveEmailToTrash={(emailId) => handleMoveToTrash('inbox', emailId, 'inbox')}
+          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('inbox', emailId, currentStarredStatus, 'inbox')} // NEW: Pass star toggle handler
           activeInboxCategory={activeInboxCategory}
           onInboxCategoryChange={handleInboxCategoryChange}
         />
@@ -365,7 +413,8 @@ export default function Home() {
         <EmailList
           emails={sentEmails}
           type="sent"
-          onMoveEmailToTrash={(emailId) => handleMoveToTrash('email', emailId, 'sent')} // NEW: Pass handler
+          onMoveEmailToTrash={(emailId) => handleMoveToTrash('sent', emailId, 'sent')}
+          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('sent', emailId, currentStarredStatus, 'sent')} // NEW: Pass star toggle handler
         />
       )}
 
@@ -373,11 +422,11 @@ export default function Home() {
         <DraftList
           drafts={drafts}
           onEditDraft={handleEditDraft}
-          onDeleteDraft={(draftId) => handleMoveToTrash('draft', draftId)} // NEW: Use move to trash
+          onDeleteDraft={(draftId) => handleMoveToTrash('draft', draftId)}
+          onToggleStarred={handleToggleStarred} // NEW: Pass star toggle handler
         />
       )}
 
-      {/* NEW: Render TrashList when activeTab is 'trash' */}
       {activeTab === 'trash' && (
         <TrashList
           trashedItems={trashedItems}
@@ -386,7 +435,15 @@ export default function Home() {
         />
       )}
 
-      {/* Placeholder for other tabs if they don't have dedicated components yet */}
+      {/* NEW: Render StarredList when activeTab is 'starred' */}
+      {activeTab === 'starred' && (
+        <StarredList
+          starredItems={starredItems}
+          onToggleStarred={handleToggleStarred} // Pass star toggle handler
+          onMoveToTrash={handleMoveToTrash} // Allow moving starred items to trash
+        />
+      )}
+
       {activeTab === 'scheduled' && <div className="text-center text-gray-600">Scheduled emails will appear here.</div>}
       {activeTab === 'spam' && <div className="text-center text-gray-600">Spam messages will appear here.</div>}
     </Layout>

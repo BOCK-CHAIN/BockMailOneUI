@@ -1,21 +1,21 @@
-// my-email-frontend/app/components/TrashList.js
+// my-email-frontend/app/components/StarredList.js
 'use client';
 
 import React from 'react';
 import { format } from 'date-fns';
-import { Undo2, Trash2, Mail, Send, FileText, Paperclip } from 'lucide-react'; // Icons for restore, permanent delete, email types
+import { Star, Mail, Send, FileText, Paperclip, Trash2 } from 'lucide-react'; // Import icons
 
-export default function TrashList({ trashedItems, onRestore, onPermanentDelete }) {
+export default function StarredList({ starredItems, onToggleStarred, onMoveToTrash }) {
   // Common class for action buttons to ensure consistent padding and size
   const actionButtonClass = "p-2 rounded-full text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0";
   const actionIconSize = 18; // Consistent icon size for actions
 
-  if (!trashedItems || trashedItems.length === 0) {
+  if (!starredItems || starredItems.length === 0) {
     return (
       <div className="flex-grow flex items-center justify-center bg-white rounded-lg shadow-md mb-6 p-6 min-h-[300px]">
         <div className="text-center text-gray-500">
-          <p className="text-lg font-semibold mb-2">Your trash is empty.</p>
-          <p>Items you delete will appear here.</p>
+          <p className="text-lg font-semibold mb-2">No starred items found.</p>
+          <p>Star important emails and drafts to see them here!</p>
         </div>
       </div>
     );
@@ -53,14 +53,15 @@ export default function TrashList({ trashedItems, onRestore, onPermanentDelete }
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow flex flex-col min-h-0">
       <div className="px-4 sm:px-6 py-4 bg-gray-100 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Trash</h2>
-        <p className="text-sm text-gray-600 mt-1">Items in trash will be permanently deleted after 30 days.</p>
+        <h2 className="text-xl font-semibold text-gray-800">Starred</h2>
+        <p className="text-sm text-gray-600 mt-1">Your most important emails and drafts.</p>
       </div>
       <ul className="divide-y divide-gray-200 overflow-y-auto flex-grow">
-        {trashedItems.map((item) => (
+        {starredItems.map((item) => (
           <li key={`${item.type}-${item.id}`} className="p-4 hover:bg-gray-50 transition-colors duration-150">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex-grow min-w-0">
+                {/* Item Type & Preview */}
                 <div className="flex items-center gap-2 mb-1">
                   {getItemIcon(item)}
                   <span className="font-semibold text-gray-700 capitalize text-sm sm:text-base">{item.type}</span>
@@ -69,27 +70,30 @@ export default function TrashList({ trashedItems, onRestore, onPermanentDelete }
                   </span>
                   {getAttachmentIcon(item)}
                 </div>
+                {/* Body Preview */}
                 <p className="text-sm text-gray-600 line-clamp-1 truncate min-w-0">
                   {item.plain_body || (item.body_html ? item.body_html.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' : '(No Body)')}
                 </p>
+                {/* Date */}
                 <p className="text-xs text-gray-400 mt-1">
-                  Trashed: {format(new Date(item.last_saved_at || item.received_at), 'MMM dd, yyyy HH:mm')}
+                  {format(new Date(item.last_saved_at || item.received_at), 'MMM dd, yyyy HH:mm')}
                 </p>
               </div>
+              {/* Action Buttons */}
               <div className="flex-shrink-0 flex items-center gap-2 mt-2 sm:mt-0 ml-0 sm:ml-4 self-end sm:self-center">
-                {/* Restore Button */}
+                {/* Star Button (to unstar) */}
                 <button
-                  onClick={() => onRestore(item.type, item.id, item.type === 'draft' ? null : item.type)} // FIXED: Pass item.type as originalFolder for emails
-                  className={`${actionButtonClass} text-blue-600 hover:bg-blue-100`}
-                  title="Restore"
+                  onClick={() => onToggleStarred(item.type, item.id, item.is_starred, item.type === 'draft' ? null : item.type)}
+                  className={`${actionButtonClass} text-yellow-500`}
+                  title="Unstar"
                 >
-                  <Undo2 size={actionIconSize} />
+                  <Star size={actionIconSize} fill="currentColor" />
                 </button>
-                {/* Permanent Delete Button */}
+                {/* Move to Trash Button */}
                 <button
-                  onClick={() => onPermanentDelete(item.type, item.id, item.type === 'email' ? item.folder : null)}
+                  onClick={() => onMoveToTrash(item.type, item.id, item.type === 'draft' ? null : item.type)}
                   className={`${actionButtonClass} text-red-600 hover:bg-red-100`}
-                  title="Delete Permanently"
+                  title="Move to Trash"
                 >
                   <Trash2 size={actionIconSize} />
                 </button>

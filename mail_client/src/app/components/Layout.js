@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { Menu, X, Pencil, Inbox, SendHorizontal, LogOut, User, FileText, Ban, Trash2, Clock, ChevronDown, ChevronUp } from "lucide-react"; // Added ChevronDown, ChevronUp icons
+import { Menu, X, Pencil, Inbox, SendHorizontal, LogOut, User, FileText, Ban, Trash2, Clock, ChevronDown, ChevronUp, Star } from "lucide-react"; // Added Star icon
 
 export default function Layout({
   userEmail,
@@ -51,7 +51,8 @@ export default function Layout({
   };
 
   // Determine if any of the "More" tabs are active
-  const isAnyMoreTabActive = ['drafts', 'scheduled', 'spam', 'trash'].includes(activeTab);
+  // UPDATED: Include 'starred' in the check
+  const isAnyMoreTabActive = ['drafts', 'scheduled', 'spam', 'trash', 'starred'].includes(activeTab);
 
   return (
     <div className="flex min-h-screen bg-[#F6F0F8]">
@@ -104,7 +105,7 @@ export default function Layout({
                 : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
             }`}
           >
-            <div className="logo flex justify-center items-center gap-2">
+            <div className="logo flex items-center gap-2">
               <Inbox size={20} />
               <span>Inbox ({inboxCount})</span>
             </div>
@@ -119,7 +120,7 @@ export default function Layout({
                 : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
             }`}
           >
-            <div className="logo flex justify-center items-center gap-2">
+            <div className="logo flex  items-center gap-2">
               <SendHorizontal width={20} height={20} />
               <span>Sent ({sentCount})</span>
             </div>
@@ -134,7 +135,7 @@ export default function Layout({
                 : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
             }`}
           >
-            <div className="logo flex justify-center items-center gap-2">
+            <div className="logo flex  items-center gap-2">
               {showMoreOptions ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               <span>More</span>
             </div>
@@ -143,6 +144,21 @@ export default function Layout({
           {/* Additional options, conditionally rendered */}
           {showMoreOptions && (
             <div className="flex flex-col gap-3 pl-4"> {/* Indent these options */}
+              {/* Starred Button - NEW */}
+              <button
+                onClick={() => handleTabChangeAndCloseSidebar("starred")}
+                className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+                  activeTab === "starred"
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
+                }`}
+              >
+                <div className="logo flex  items-center gap-2">
+                  <Star size={20} />
+                  <span>Starred</span>
+                </div>
+              </button>
+
               {/* Drafts Button */}
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("drafts")}
@@ -152,7 +168,7 @@ export default function Layout({
                     : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
                 }`}
               >
-                <div className="logo flex justify-center items-center gap-2">
+                <div className="logo flex  items-center gap-2">
                   <FileText size={20} />
                   <span>Drafts</span>
                 </div>
@@ -167,7 +183,7 @@ export default function Layout({
                     : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
                 }`}
               >
-                <div className="logo flex justify-center items-center gap-2">
+                <div className="logo flex  items-center gap-2">
                   <Clock size={20} />
                   <span>Scheduled</span>
                 </div>
@@ -182,7 +198,7 @@ export default function Layout({
                     : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
                 }`}
               >
-                <div className="logo flex justify-center items-center gap-2">
+                <div className="logo flex  items-center gap-2">
                   <Ban size={20} />
                   <span>Spam</span>
                 </div>
@@ -197,7 +213,7 @@ export default function Layout({
                     : "bg-[#7D2A7E] text-white hover:bg-[#5f3860]"
                 }`}
               >
-                <div className="logo flex justify-center items-center gap-2">
+                <div className="logo flex  items-center gap-2">
                   <Trash2 size={20} />
                   <span>Trash</span>
                 </div>

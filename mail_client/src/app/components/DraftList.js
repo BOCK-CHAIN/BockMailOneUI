@@ -3,9 +3,9 @@
 
 import React from 'react';
 import { format } from 'date-fns'; // For date formatting
-import { Edit, Trash2, Paperclip } from 'lucide-react'; // Icons for edit, delete, attachment
+import { Edit, Trash2, Paperclip, Star } from 'lucide-react'; // Import Star icon
 
-export default function DraftList({ drafts, onEditDraft, onDeleteDraft }) {
+export default function DraftList({ drafts, onEditDraft, onDeleteDraft, onToggleStarred }) { // Added onToggleStarred prop
   if (!drafts || drafts.length === 0) {
     return (
       <div className="text-center py-10 text-gray-500">
@@ -47,6 +47,18 @@ export default function DraftList({ drafts, onEditDraft, onDeleteDraft }) {
                 </p>
               </div>
               <div className="flex-shrink-0 flex items-center gap-2 ml-4">
+                {/* NEW: Star Button */}
+                <button
+                  onClick={(e) => { // Stop propagation to prevent editing the draft when starring
+                    e.stopPropagation();
+                    onToggleStarred('draft', draft.id, draft.is_starred); // Pass 'draft' as itemType
+                  }}
+                  className={`p-2 rounded-full ${draft.is_starred ? 'text-yellow-500' : 'text-gray-400 hover:text-yellow-500'} transition-colors`}
+                  title={draft.is_starred ? 'Unstar Draft' : 'Star Draft'}
+                >
+                  <Star size={18} fill={draft.is_starred ? 'currentColor' : 'none'} />
+                </button>
+                {/* Edit Button */}
                 <button
                   onClick={() => onEditDraft(draft)}
                   className="p-2 rounded-full text-blue-600 hover:bg-blue-100 transition-colors"
@@ -54,10 +66,11 @@ export default function DraftList({ drafts, onEditDraft, onDeleteDraft }) {
                 >
                   <Edit size={18} />
                 </button>
+                {/* Delete Button */}
                 <button
                   onClick={() => onDeleteDraft(draft.id)}
                   className="p-2 rounded-full text-red-600 hover:bg-red-100 transition-colors"
-                  title="Delete Draft"
+                  title="Move to Trash"
                 >
                   <Trash2 size={18} />
                 </button>
