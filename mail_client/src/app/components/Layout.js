@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { Menu, X, Pencil, Inbox, SendHorizontal, LogOut, User, FileText, Ban, Trash2, Clock, ChevronDown, ChevronUp, Star } from "lucide-react"; // Added Star icon
+import { Menu, X, Pencil, Inbox, SendHorizontal, LogOut, User, FileText, Ban, Trash2, Clock, ChevronDown, ChevronUp, Star, Settings } from "lucide-react"; // Added Settings icon
 
 export default function Layout({
   userEmail,
@@ -13,11 +13,22 @@ export default function Layout({
   sentCount,
   onMinimizeCompose, // Function to minimize compose window
   children,
+  userSettings,
+  labelSettings
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false); // New state for 'More' section
   const profileDropdownRef = useRef(null);
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  // Construct the full URL for the profile picture
+  const profilePictureUrl = userSettings?.profile_picture_url 
+    ? `${BACKEND_URL}${userSettings.profile_picture_url}` 
+    : null;
+    
+  // Get the user's initial for the fallback
+  const userInitial = userSettings?.name?.charAt(0).toUpperCase() || userEmail?.charAt(0).toUpperCase() || 'U';
 
   const toggleProfileDropdown = () => {
     setShowProfileDropdown(prev => !prev);
@@ -48,10 +59,10 @@ export default function Layout({
   const handleTabChangeAndCloseSidebar = (tab) => {
     onTabChange(tab);
     setSidebarOpen(false); // Close sidebar on mobile after tab selection
+    setShowProfileDropdown(false); // Close profile dropdown if open
   };
 
   // Determine if any of the "More" tabs are active
-  // UPDATED: Include 'starred' in the check
   const isAnyMoreTabActive = ['drafts', 'scheduled', 'spam', 'trash', 'starred'].includes(activeTab);
 
   return (
@@ -112,6 +123,7 @@ export default function Layout({
           </button>
 
           {/* Sent Button */}
+          {labelSettings?.sent === 'show' && (
           <button
             onClick={() => handleTabChangeAndCloseSidebar("sent")}
             className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -124,7 +136,7 @@ export default function Layout({
               <SendHorizontal width={20} height={20} />
               <span>Sent ({sentCount})</span>
             </div>
-          </button>
+          </button>)}
 
           {/* "More" button to toggle additional options */}
           <button
@@ -144,7 +156,8 @@ export default function Layout({
           {/* Additional options, conditionally rendered */}
           {showMoreOptions && (
             <div className="flex flex-col gap-3 pl-4"> {/* Indent these options */}
-              {/* Starred Button - NEW */}
+              {/* Starred Button */}
+              {labelSettings?.starred === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("starred")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -157,9 +170,10 @@ export default function Layout({
                   <Star size={20} />
                   <span>Starred</span>
                 </div>
-              </button>
+              </button>)}
 
               {/* Drafts Button */}
+              {labelSettings?.drafts === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("drafts")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -172,9 +186,10 @@ export default function Layout({
                   <FileText size={20} />
                   <span>Drafts</span>
                 </div>
-              </button>
+              </button>)}
 
               {/* Scheduled Button */}
+              {labelSettings?.scheduled === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("scheduled")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -187,9 +202,10 @@ export default function Layout({
                   <Clock size={20} />
                   <span>Scheduled</span>
                 </div>
-              </button>
+              </button>)}
 
               {/* Spam Button */}
+              {labelSettings?.spam === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("spam")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -202,9 +218,10 @@ export default function Layout({
                   <Ban size={20} />
                   <span>Spam</span>
                 </div>
-              </button>
+              </button>)}
 
               {/* Trash Button */}
+              {labelSettings?.trash === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("trash")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -217,7 +234,7 @@ export default function Layout({
                   <Trash2 size={20} />
                   <span>Trash</span>
                 </div>
-              </button>
+              </button>)}
             </div>
           )}
         </nav>
@@ -282,6 +299,13 @@ export default function Layout({
                   <User size={16} className="text-gray-500" />
                   <span className="break-words">{userEmail}</span>
                 </div>
+                {/* NEW: Settings Button */}
+                <button
+                  onClick={() => handleTabChangeAndCloseSidebar("settings")}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <Settings size={16} /> Settings
+                </button>
                 <button
                   onClick={() => { onLogout(); setShowProfileDropdown(false); }}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -322,19 +346,36 @@ export default function Layout({
 
             {/* Profile Section (Desktop) */}
             <div className="flex items-center gap-3 ml-4 max-md:hidden relative" ref={profileDropdownRef}>
-              <button
-                onClick={toggleProfileDropdown}
-                className="w-9 h-9 rounded-full bg-purple-700 text-white flex items-center justify-center font-semibold uppercase shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                aria-label="User Profile"
-              >
-                {userEmail?.charAt(0) || "U"}
-              </button>
+            <button
+              onClick={toggleProfileDropdown}
+              className="w-9 h-9 rounded-full bg-purple-700 text-white flex items-center justify-center font-semibold uppercase shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 overflow-hidden"
+              aria-label="User Profile"
+            >
+              {profilePictureUrl ? (
+                <img 
+                  src={profilePictureUrl} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  // Fallback to initial if the image fails to load
+                  onError={(e) => { e.target.onerror = null; e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+                />
+              ) : (
+                <span>{userInitial}</span>
+              )}
+            </button>
               {showProfileDropdown && (
                 <div className="absolute right-0 top-full mt-2 w-60 bg-white rounded-lg shadow-xl py-2 z-40 animate-fade-in-down">
                   <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-200 flex items-center gap-2">
                     <User size={16} className="text-gray-500" />
                     <span className="break-words">{userEmail}</span>
                   </div>
+                  {/* NEW: Settings Button */}
+                  <button
+                    onClick={() => handleTabChangeAndCloseSidebar("settings")}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <Settings size={16} /> Settings
+                  </button>
                   <button
                     onClick={() => { onLogout(); setShowProfileDropdown(false); }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

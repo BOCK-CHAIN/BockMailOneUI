@@ -4,11 +4,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPaperclip, FaBold, FaItalic, FaUnderline, FaListUl, FaListOl, FaLink, FaUndo, FaRedo, FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify, FaImage, FaTrash } from 'react-icons/fa';
 import { HexColorPicker } from 'react-colorful';
-import { Minus, Maximize2, Minimize2, X, Clock } from 'lucide-react'; // Import all necessary icons
-import apiClient from '../api/client'; // Import apiClient for draft saving
+import { Minus, Maximize2, Minimize2, X, Clock } from 'lucide-react';
+import apiClient from '../api/client';
 
-// This component now represents the floating compose window
-export default function ComposeForm({ onSendEmail, message, onClose, isMinimized, onMinimizeToggle, isMaximized, onMaximizeToggle, initialDraft, onDraftSaved, onMoveDraftToTrash }) {
+export default function ComposeForm({ onSendEmail, message, onClose, isMinimized, onMinimizeToggle, isMaximized, onMaximizeToggle, initialDraft, onDraftSaved, onMoveDraftToTrash, userSettings }) {
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
   const [cc, setCc] = useState('');
@@ -20,7 +19,7 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
   const [attachments, setAttachments] = useState([]);
   const fileInputRef = useRef(null);
 
-  const editorRef = useRef(null); // Ref for the contenteditable div
+  const editorRef = useRef(null);
   const [bodyHtml, setBodyHtml] = useState('');
 
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -29,15 +28,12 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
 
   const imageInputRef = useRef(null);
 
-  // State for scheduling
   const [showScheduleOptions, setShowScheduleOptions] = useState(false);
   const [scheduledDateTime, setScheduledDateTime] = useState('');
   const scheduleButtonRef = useRef(null);
 
-  // STATE FOR DRAFT ID
-  const [draftId, setDraftId] = useState(null); // Stores the ID of the current draft
+  const [draftId, setDraftId] = useState(null);
 
-  // Function to execute editor commands
   const execCommand = useCallback((command, value = null) => {
     if (editorRef.current) {
       document.execCommand(command, false, value);
@@ -54,17 +50,39 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     }
   }, []);
 
-  // Effect to load initial draft content or clear for new compose
+  // --- NEW: Function to append signature using innerHTML ---
+  const appendSignature = (signatureContent) => {
+    if (!editorRef.current || !signatureContent) return;
+
+    const signatureHtml = `<br><br>-- <br>${signatureContent.replace(/\n/g, '<br>')}`;
+    const initialContent = signatureHtml;
+    
+    editorRef.current.innerHTML = initialContent;
+    setBodyHtml(initialContent);
+
+    // Place the cursor at the beginning of the editor
+    const range = document.createRange();
+    const sel = window.getSelection();
+    if (editorRef.current.firstChild) {
+      range.setStart(editorRef.current, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  // Effect to load initial draft content or apply signature for new compose
   useEffect(() => {
     if (initialDraft) {
       setDraftId(initialDraft.id);
       setTo(initialDraft.recipient_email || '');
       setSubject(initialDraft.subject || '');
-      setBodyHtml(initialDraft.body_html || '');
+      const draftBody = initialDraft.body_html || '';
+      setBodyHtml(draftBody);
       if (editorRef.current) {
-        editorRef.current.innerHTML = initialDraft.body_html || '';
+        editorRef.current.innerHTML = draftBody;
       }
-      setAttachments(initialDraft.attachments_info ? initialDraft.attachments_info.map(att => ({ name: att.name, size: att.size, fileObject: null })) : []);
+      setAttachments(initialDraft.attachments_info ? JSON.parse(initialDraft.attachments_info).map(att => ({ name: att.name, size: att.size, fileObject: null })) : []);
       
       setShowCc(false);
       setCc('');
@@ -72,6 +90,7 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
       setBcc('');
 
     } else {
+      // Logic for a new email
       setDraftId(null);
       setTo('');
       setSubject('');
@@ -81,15 +100,26 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
       setShowBcc(false);
       setAttachments([]);
       setScheduledDateTime('');
-      if (editorRef.current) {
-        editorRef.current.innerHTML = '';
+
+      // --- NEW: Find and apply the default signature for new emails ---
+      const signatures = userSettings?.signatures || [];
+      const defaultSigId = userSettings?.default_signature_new;
+      const defaultSignature = signatures.find(sig => sig.id === defaultSigId);
+
+      if (defaultSignature) {
+        appendSignature(defaultSignature.content);
+      } else {
+        // If no default signature, ensure the editor is empty
+        if (editorRef.current) {
+          editorRef.current.innerHTML = '';
+        }
         setBodyHtml('');
       }
     }
     if (editorRef.current) {
       editorRef.current.focus();
     }
-  }, [initialDraft]);
+  }, [initialDraft, userSettings]); // Depend on userSettings
 
   // Auto-save draft effect with debounce
   useEffect(() => {
@@ -168,7 +198,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  // CC/BCC close logic
   const handleRemoveCc = () => {
     setCc('');
     setShowCc(false);
@@ -179,7 +208,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     setShowBcc(false);
   };
 
-  // Link functionality
   const setLink = useCallback(() => {
     const url = prompt('Enter the URL:');
     if (url) {
@@ -187,7 +215,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     }
   }, [execCommand]);
 
-  // Image insertion from system
   const addImage = useCallback(() => {
     imageInputRef.current.click();
   }, []);
@@ -204,7 +231,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     }
   }, [execCommand]);
 
-  // Font Size implementation
   const fontSizes = [
     { label: 'Small', value: '1' }, { label: 'Normal', value: '3' },
     { label: 'Medium', value: '4' }, { label: 'Large', value: '5' },
@@ -215,7 +241,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     execCommand('fontSize', e.target.value);
   }, [execCommand]);
 
-  // Font Family implementation
   const fontFamilies = [
     { label: 'Arial', value: 'Arial' }, { label: 'Courier New', value: 'Courier New' },
     { label: 'Georgia', value: 'Georgia' }, { label: 'Times New Roman', value: 'Times New Roman' },
@@ -226,18 +251,15 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     execCommand('fontName', e.target.value);
   }, [execCommand]);
 
-  // Text Color implementation
   const handleTextColorChange = useCallback((color) => {
     setCurrentColor(color);
     execCommand('foreColor', color);
   }, [execCommand]);
 
-  // Clear formatting
   const clearFormatting = useCallback(() => {
     execCommand('removeFormat');
   }, [execCommand]);
 
-  // Helper to calculate future dates for scheduling
   const getScheduledTime = (type) => {
     const now = new Date();
     let targetDate = new Date(now);
@@ -264,7 +286,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // Handle scheduling an email
   const handleScheduleSend = async (scheduleType) => {
     let finalScheduledAt = null;
     if (scheduleType === 'custom') {
@@ -281,7 +302,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     setShowScheduleOptions(false);
   };
 
-  // Main submit handler
   const handleSubmit = async (e, scheduledAt = null) => {
     e.preventDefault();
 
@@ -295,9 +315,11 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
 
     const filesToUpload = attachments.filter(att => att.fileObject);
 
-    await onSendEmail(recipients.join(','), subject, bodyHtml, filesToUpload, scheduledAt, draftId);
+    // Get the latest HTML from the editor ref before sending
+    const currentBodyHtml = editorRef.current ? editorRef.current.innerHTML : bodyHtml;
 
-    // Clear form fields and editor after successful send
+    await onSendEmail(recipients.join(','), subject, currentBodyHtml, filesToUpload, scheduledAt, draftId);
+
     setTo('');
     setSubject('');
     setCc('');
@@ -306,7 +328,7 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     setShowBcc(false);
     setAttachments([]);
     setScheduledDateTime('');
-    setDraftId(null); // Clear draft ID after sending
+    setDraftId(null);
     if (editorRef.current) {
       editorRef.current.innerHTML = '';
       setBodyHtml('');
@@ -314,30 +336,15 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
     }
   };
 
-  // NEW: Handle discarding draft (moving to trash) via a dedicated button
   const handleDiscardButtonAction = () => {
     if (draftId) {
-      // If it's an existing draft (or auto-saved new one), move it to trash
       onMoveDraftToTrash(draftId);
-    } else if (to || subject || bodyHtml || attachments.length > 0) {
-      // If it's a new compose with unsaved content, auto-save will handle it.
-      // But if user clicks discard before auto-save, we need to ensure it's trashed.
-      // The auto-save useEffect will trigger a save, which will set draftId.
-      // For immediate discard of a new, unsaved compose, we can just close it.
-      // If the user wants to trash it, they should wait for auto-save or explicitly save first.
-      // Or, we can trigger an immediate save here, then trash.
-      // For simplicity and matching Gmail, if it's a new compose and user hits discard, it's just closed.
-      // The auto-save handles persistent drafts.
-      console.log('No draft ID, closing compose window. Content will be auto-saved if significant.');
-      onClose(); // Just close, rely on auto-save for persistence
     } else {
-      // If no content and no draftId, just close
       onClose();
     }
   };
 
 
-  // Determine dynamic classes and styles based on window state props
   let windowClasses = `fixed bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ease-in-out`;
   const windowStyles = {};
 
@@ -359,13 +366,11 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
       className={windowClasses}
       style={windowStyles}
     >
-      {/* Window Header */}
       <div
         className="flex items-center justify-between bg-gray-200 px-4 py-2 cursor-default"
       >
         <h2 className="text-base font-semibold text-gray-800">New Message</h2>
         <div className="flex items-center gap-2">
-          {/* Minimize Button */}
           <button
             type="button"
             onClick={onMinimizeToggle}
@@ -374,7 +379,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
           >
             <Minus size={16} />
           </button>
-          {/* Maximize/Restore Button */}
           <button
             type="button"
             onClick={onMaximizeToggle}
@@ -383,22 +387,19 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
           >
             {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
-          {/* Close Button (X) - Now just closes, relies on auto-save for draft */}
           <button
             type="button"
-            onClick={onClose} // Changed back to onClose
+            onClick={onClose}
             className="p-1 rounded hover:bg-red-200 text-red-600"
-            title="Close" // Title changed to "Close"
+            title="Close"
           >
             <X size={16} />
           </button>
         </div>
       </div>
 
-      {/* Form Content (hidden when minimized) */}
       {!isMinimized && (
         <form onSubmit={(e) => handleSubmit(e, null)} className="relative flex flex-col flex-grow p-4 gap-0 overflow-hidden">
-          {/* Recipients (To) field with CC/BCC buttons */}
           <div className="flex items-center border-b border-gray-300 focus-within:border-blue-500">
             <input
               type="email"
@@ -430,7 +431,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
             </div>
           </div>
 
-          {/* CC field - Conditionally rendered with close button */}
           {showCc && (
             <div className="flex items-center border-b border-gray-300 focus-within:border-blue-500">
               <input
@@ -451,7 +451,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
             </div>
           )}
 
-          {/* BCC field - Conditionally rendered with close button */}
           {showBcc && (
             <div className="flex items-center border-b border-gray-300 focus-within:border-blue-500">
               <input
@@ -472,7 +471,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
             </div>
           )}
 
-          {/* Subject field */}
           <input
             type="text"
             value={subject}
@@ -482,50 +480,40 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
             className="py-2 border-b border-gray-300 focus:border-blue-500 focus:outline-none text-base mt-0"
           />
           
-          {/* Contenteditable Editor */}
           <div className=" flex flex-col flex-grow border-b border-gray-300 rounded-b-lg overflow-hidden mt-3">
-            {/* Toolbar */}
             <div className="flex flex-wrap gap-1 p-1 border-b border-gray-200 bg-gray-50">
-              {/* Undo/Redo */}
               <button type="button" onClick={() => execCommand('undo')} className="p-1 rounded hover:bg-gray-200" title="Undo"><FaUndo size={14} /></button>
               <button type="button" onClick={() => execCommand('redo')} className="p-1 rounded hover:bg-gray-200" title="Redo"><FaRedo size={14} /></button>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Font Family Dropdown */}
               <select onChange={handleFontFamilyChange} className="p-1 rounded border bg-white hover:bg-gray-200 text-xs" title="Font Family">
                 <option value="">Font Family</option>
                 {fontFamilies.map(font => (<option key={font.value} value={font.value}>{font.label}</option>))}
               </select>
-              {/* Font Size Dropdown */}
               <select onChange={handleFontSizeChange} className="p-1 rounded border bg-white hover:bg-gray-200 text-xs" title="Font Size">
                 <option value="">Font Size</option>
                 {fontSizes.map(size => (<option key={size.value} value={size.value}>{size.label}</option>))}
               </select>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Inline Styles */}
               <button type="button" onClick={() => execCommand('bold')} className="p-1 rounded hover:bg-gray-200" title="Bold"><FaBold size={14} /></button>
               <button type="button" onClick={() => execCommand('italic')} className="p-1 rounded hover:bg-gray-200" title="Italic"><FaItalic size={14} /></button>
               <button type="button" onClick={() => execCommand('underline')} className="p-1 rounded hover:bg-gray-200" title="Underline"><FaUnderline size={14} /></button>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Lists */}
               <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-1 rounded hover:bg-gray-200" title="Bullet List"><FaListUl size={14} /></button>
               <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-1 rounded hover:bg-gray-200" title="Numbered List"><FaListOl size={14} /></button>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Text Alignment */}
               <button type="button" onClick={() => execCommand('justifyLeft')} className="p-1 rounded hover:bg-gray-200" title="Align Left"><FaAlignLeft size={14} /></button>
               <button type="button" onClick={() => execCommand('justifyCenter')} className="p-1 rounded hover:bg-gray-200" title="Align Center"><FaAlignCenter size={14} /></button>
               <button type="button" onClick={() => execCommand('justifyRight')} className="p-1 rounded hover:bg-gray-200" title="Align Right"><FaAlignRight size={14} /></button>
               <button type="button" onClick={() => execCommand('justifyFull')} className="p-1 rounded hover:bg-gray-200" title="Justify"><FaAlignJustify size={14} /></button>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Link */}
               <button type="button" onClick={setLink} className="p-1 rounded hover:bg-gray-200" title="Insert Link"><FaLink size={14} /></button>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Text Color */}
               <div className="" ref={colorPickerButtonRef}>
                 <button type="button" onClick={() => setShowColorPicker(!showColorPicker)} className={`p-1 rounded hover:bg-gray-200`} title="Text Color">
                   <span style={{ color: currentColor, fontSize: '14px' }}>A</span>
@@ -539,16 +527,13 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
               </div>
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Image Button */}
               <button type="button" onClick={addImage} className="p-1 rounded hover:bg-gray-200" title="Insert Image from System"><FaImage size={14} /></button>
               <input type="file" ref={imageInputRef} onChange={handleImageFileChange} accept="image/*" className="hidden" />
               <div className="border-l border-gray-300 mx-1 h-5"></div>
 
-              {/* Clear Formatting */}
               <button type="button" onClick={clearFormatting} className="p-1 rounded hover:bg-gray-200" title="Clear Formatting"><FaTrash size={14} /></button>
             </div>
 
-            {/* Contenteditable Div */}
             <div
               ref={editorRef}
               contentEditable="true"
@@ -561,10 +546,8 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
             />
           </div>
 
-          {/* Footer with Send, Schedule, Attachments, and NEW Discard Button */}
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-3">
-              {/* Send Button */}
               <button
                 type="submit"
                 onClick={(e) => handleSubmit(e, null)}
@@ -573,7 +556,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
                 Send
               </button>
 
-              {/* Schedule Send Button with Dropdown */}
               <div className="relative" ref={scheduleButtonRef}>
                 <button
                   type="button"
@@ -635,7 +617,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
                 )}
               </div>
 
-              {/* Attachment Button */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current.click()}
@@ -644,7 +625,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
               >
                 <FaPaperclip size={18} />
               </button>
-              {/* Hidden file input for email attachments */}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -654,7 +634,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
               />
             </div>
 
-            {/* NEW: Discard Button */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -666,7 +645,6 @@ export default function ComposeForm({ onSendEmail, message, onClose, isMinimized
               </button>
             </div>
 
-            {/* Display selected attachments */}
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 ml-4">
                 {attachments.map((file, index) => (

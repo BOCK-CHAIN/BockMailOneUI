@@ -10,7 +10,8 @@ import Layout from './components/Layout';
 import EmailList from './components/EmailList';
 import DraftList from './components/DraftList';
 import TrashList from './components/TrashList';
-import StarredList from './components/StarredList'; // NEW: Import StarredList
+import StarredList from './components/StarredList';
+import SettingsPage from './components/SettingsPage';
 
 import dynamic from 'next/dynamic';
 const DynamicComposeForm = dynamic(() => import('./components/ComposeForm'), { ssr: false });
@@ -37,8 +38,21 @@ export default function Home() {
   // STATE FOR TRASH
   const [trashedItems, setTrashedItems] = useState([]);
 
-  // NEW STATE FOR STARRED ITEMS
+  // STATE FOR STARRED ITEMS
   const [starredItems, setStarredItems] = useState([]);
+
+  // STATE FOR USER SETTINGS
+  const [userSettings, setUserSettings] = useState(null);
+
+   // 1. Add new state for label visibility settings
+   const [labelSettings, setLabelSettings] = useState({
+    starred: 'show',
+    drafts: 'show',
+    sent: 'show',
+    trash: 'show',
+    spam: 'show',
+    scheduled: 'show',
+  });
 
 
   useEffect(() => {
@@ -47,13 +61,15 @@ export default function Home() {
       fetchEmails('sent');
       fetchDrafts();
       fetchTrashedItems();
-      fetchStarredItems(); // NEW: Fetch starred items on login
+      fetchStarredItems();
+      fetchUserSettings(); // Fetch settings on login
     } else {
       setAllInboxEmails([]);
       setSentEmails([]);
       setDrafts([]);
       setTrashedItems([]);
-      setStarredItems([]); // NEW: Clear starred items on logout
+      setStarredItems([]);
+      setUserSettings(null); // Clear settings on logout
     }
   }, [isLoggedIn]);
 
@@ -121,7 +137,7 @@ export default function Home() {
     }
   };
 
-  // NEW: Fetch Starred Items
+  // Fetch Starred Items
   const fetchStarredItems = async () => {
     try {
       const res = await apiClient.get('/api/starred');
@@ -129,6 +145,80 @@ export default function Home() {
     } catch (err) {
       console.error('Failed to fetch starred items:', err);
       setAppMessage('Failed to fetch starred items.');
+    }
+  };
+  
+  // Function to fetch user settings
+  const fetchUserSettings = async () => {
+    try {
+        const res = await apiClient.get('/api/settings/general');
+        setUserSettings(res.data);
+    } catch (err) {
+        console.error('Failed to fetch user settings:', err);
+        setAppMessage('Could not load your settings.');
+    }
+  };
+
+  /**
+   * Handles saving all general settings. It first uploads a new profile picture
+   * if one exists, then saves all other text-based settings.
+   * @param {object} settingsData - The settings data from the form.
+   * @param {File} profilePicFile - The new profile picture file object, or null.
+   */
+  const handleSaveSettings = async (settingsData, profilePicFile) => {
+    try {
+        let finalSettings = { ...settingsData };
+
+        // Step 1: Handle profile picture upload if a new file was selected
+        if (profilePicFile) {
+            setAppMessage('Uploading profile picture...');
+            const formData = new FormData();
+            formData.append('profilePicture', profilePicFile);
+
+            // Call the dedicated upload route
+            const uploadRes = await apiClient.post('/api/settings/upload-profile-picture', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            // Get the new URL from the backend and add it to our settings object
+            finalSettings.profile_picture_url = uploadRes.data.settings.profile_picture_url;
+            setAppMessage('Profile picture updated! Saving other settings...');
+        }
+
+        // Step 2: Save all other settings (including the new URL if it exists)
+        const saveRes = await apiClient.patch('/api/settings/general', finalSettings);
+
+        // Update the main userSettings state with the final, saved settings
+        setUserSettings(saveRes.data.settings);
+        setAppMessage(saveRes.data.message);
+        fetchUserSettings(); 
+
+    } catch (err) {
+        console.error('Failed to save settings:', err);
+        setAppMessage(err.response?.data?.message || 'Failed to save settings.');
+    }
+  };
+
+  // 2. Add new handler to update the label settings state
+  const handleLabelSettingsChange = (newSettings) => {
+    setLabelSettings(newSettings);
+    // In a real app, you would also save this to the backend here.
+    // For now, we just update the local state.
+    setAppMessage('Label visibility updated!');
+  };
+
+  const handleChangePassword = async (oldPassword, newPassword) => {
+    try {
+      const response = await apiClient.post('/change-password', {
+        oldPassword,
+        newPassword,
+      });
+      setAppMessage(response.data.message); // Set success message
+    } catch (err) {
+      // Set the error message from the backend response
+      const msg = err.response?.data?.message || 'Failed to change password.';
+      setAppMessage(msg);
+      console.error('Failed to change password:', err);
     }
   };
 
@@ -166,7 +256,7 @@ export default function Home() {
       fetchEmails('sent');
       fetchDrafts();
       fetchTrashedItems();
-      fetchStarredItems(); // NEW: Re-fetch starred items after sending (if a starred draft was sent)
+      fetchStarredItems();
       setActiveTab('sent');
       setShowComposeWindow(false);
       setIsComposeMinimized(false);
@@ -192,8 +282,10 @@ export default function Home() {
       fetchDrafts();
     } else if (tab === 'trash') {
       fetchTrashedItems();
-    } else if (tab === 'starred') { // NEW: Fetch starred items when starred tab is opened
+    } else if (tab === 'starred') {
       fetchStarredItems();
+    } else if (tab === 'settings') { // NEW: Handle settings tab
+      fetchUserSettings(); // Fetch latest settings when tab is clicked
     }
   };
 
@@ -253,7 +345,7 @@ export default function Home() {
         fetchEmails('sent');
       }
       fetchTrashedItems();
-      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was trashed)
+      fetchStarredItems();
     } catch (err) {
       console.error(`Failed to move ${itemType} to trash:`, err);
       setAppMessage(`Failed to move ${itemType} to trash.`);
@@ -276,7 +368,7 @@ export default function Home() {
         setAppMessage('Email permanently deleted!');
       }
       fetchTrashedItems();
-      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was permanently deleted from trash)
+      fetchStarredItems();
     } catch (err) {
       console.error(`Failed to permanently delete ${itemType}:`, err);
       setAppMessage(`Failed to permanently delete ${itemType}.`);
@@ -303,14 +395,44 @@ export default function Home() {
         fetchEmails('sent');
       }
       fetchTrashedItems();
-      fetchStarredItems(); // NEW: Re-fetch starred items (if a starred item was restored)
+      fetchStarredItems();
     } catch (err) {
       console.error(`Failed to restore ${itemType} from trash:`, err);
       setAppMessage(`Failed to restore ${itemType} from trash.`);
     }
   };
+  /**
+   * NEW: Handles all actions related to creating, updating, or deleting signatures.
+   * @param {string} action - The type of action: 'create', 'update', or 'delete'.
+   * @param {object} data - The signature data.
+   */
+  const handleSignatureAction = async (action, data) => {
+    try {
+      let response;
+      switch (action) {
+        case 'create':
+          response = await apiClient.post('/api/signatures', { name: data.name, content: data.content });
+          break;
+        case 'update':
+          response = await apiClient.patch(`/api/signatures/${data.id}`, { name: data.name, content: data.content });
+          break;
+        case 'delete':
+          response = await apiClient.delete(`/api/signatures/${data.id}`);
+          break;
+        default:
+          throw new Error('Invalid signature action');
+      }
+      setAppMessage(response.data.message);
+      // IMPORTANT: Re-fetch all settings to update the UI with the latest signature list
+      fetchUserSettings();
+    } catch (err) {
+      console.error(`Failed to ${action} signature:`, err);
+      setAppMessage(err.response?.data?.message || `Failed to ${action} signature.`);
+    }
+  };
 
-  // NEW: Function to toggle starred status for any item type
+
+  // Function to toggle starred status for any item type
   const handleToggleStarred = async (itemType, itemId, currentStarredStatus, emailType = null) => {
     try {
       const newStarredStatus = !currentStarredStatus;
@@ -319,7 +441,7 @@ export default function Home() {
       if (itemType === 'draft') {
         result = await apiClient.patch('/api/starred/draft', { draftId: itemId, isStarred: newStarredStatus });
         setAppMessage(`Draft ${newStarredStatus ? 'starred' : 'unstarred'}!`);
-        fetchDrafts(); // Re-fetch drafts to update their starred status
+        fetchDrafts();
       } else if (itemType === 'inbox' || itemType === 'sent') {
         if (!emailType) {
           console.error("Email type (sent/inbox) is required for toggling starred status.");
@@ -328,14 +450,14 @@ export default function Home() {
         }
         result = await apiClient.patch('/api/starred/email', { emailId: itemId, emailType: emailType, isStarred: newStarredStatus });
         setAppMessage(`Email ${newStarredStatus ? 'starred' : 'unstarred'}!`);
-        fetchEmails('inbox'); // Re-fetch emails to update their starred status
+        fetchEmails('inbox');
         fetchEmails('sent');
       } else {
         console.error("Invalid item type for toggling starred status.");
         setAppMessage("Error: Invalid item type for star toggle.");
         return;
       }
-      fetchStarredItems(); // Always re-fetch starred items to update the starred list
+      fetchStarredItems();
     } catch (err) {
       console.error(`Failed to toggle starred status for ${itemType}:`, err);
       setAppMessage(`Failed to toggle starred status for ${itemType}.`);
@@ -375,8 +497,11 @@ export default function Home() {
       inboxCount={allInboxEmails.length}
       sentCount={sentEmails.length}
       onMinimizeCompose={handleMinimizeCompose}
+      userSettings={userSettings}
+      labelSettings={labelSettings} 
     >
-      {appMessage && <p className="mb-4 text-center text-green-600">{appMessage}</p>}
+      {/* Hide app message on settings tab since SettingsPage has its own message display */}
+      {appMessage && activeTab !== 'settings' && <p className="mb-4 text-center text-green-600">{appMessage}</p>}
 
       {showComposeWindow && (
         <DynamicComposeForm
@@ -390,11 +515,12 @@ export default function Home() {
           initialDraft={selectedDraft}
           onDraftSaved={fetchDrafts}
           onMoveDraftToTrash={(draftIdToTrash) => {
-            handleMoveToTrash('draft', draftIdToClear);
+            handleMoveToTrash('draft', draftIdToTrash);
             setShowComposeWindow(false);
             setSelectedDraft(null);
           }}
-          onToggleStarred={handleToggleStarred} // NEW: Pass star toggle handler
+          onToggleStarred={handleToggleStarred}
+          userSettings={userSettings} 
         />
       )}
 
@@ -403,7 +529,7 @@ export default function Home() {
           emails={filteredInboxEmails}
           type="inbox"
           onMoveEmailToTrash={(emailId) => handleMoveToTrash('inbox', emailId, 'inbox')}
-          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('inbox', emailId, currentStarredStatus, 'inbox')} // NEW: Pass star toggle handler
+          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('inbox', emailId, currentStarredStatus, 'inbox')}
           activeInboxCategory={activeInboxCategory}
           onInboxCategoryChange={handleInboxCategoryChange}
         />
@@ -414,7 +540,7 @@ export default function Home() {
           emails={sentEmails}
           type="sent"
           onMoveEmailToTrash={(emailId) => handleMoveToTrash('sent', emailId, 'sent')}
-          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('sent', emailId, currentStarredStatus, 'sent')} // NEW: Pass star toggle handler
+          onToggleStarred={(emailId, currentStarredStatus) => handleToggleStarred('sent', emailId, currentStarredStatus, 'sent')}
         />
       )}
 
@@ -423,7 +549,7 @@ export default function Home() {
           drafts={drafts}
           onEditDraft={handleEditDraft}
           onDeleteDraft={(draftId) => handleMoveToTrash('draft', draftId)}
-          onToggleStarred={handleToggleStarred} // NEW: Pass star toggle handler
+          onToggleStarred={handleToggleStarred}
         />
       )}
 
@@ -435,14 +561,29 @@ export default function Home() {
         />
       )}
 
-      {/* NEW: Render StarredList when activeTab is 'starred' */}
       {activeTab === 'starred' && (
         <StarredList
           starredItems={starredItems}
-          onToggleStarred={handleToggleStarred} // Pass star toggle handler
-          onMoveToTrash={handleMoveToTrash} // Allow moving starred items to trash
+          onToggleStarred={handleToggleStarred}
+          onMoveToTrash={handleMoveToTrash}
         />
       )}
+
+      {/* NEW: Render SettingsPage when tab is active */}
+      {activeTab === 'settings' && userSettings && (
+        <SettingsPage 
+            initialSettings={userSettings}
+            onSave={handleSaveSettings}
+            appMessage={appMessage}
+            onSignatureAction={handleSignatureAction}
+            labelSettings={labelSettings}
+            onLabelSettingsChange={handleLabelSettingsChange}
+            onChangePassword={handleChangePassword} 
+        />
+      )}
+      {/* Show a loading state while settings are being fetched */}
+      {activeTab === 'settings' && !userSettings && <div className="text-center p-8">Loading settings...</div>}
+
 
       {activeTab === 'scheduled' && <div className="text-center text-gray-600">Scheduled emails will appear here.</div>}
       {activeTab === 'spam' && <div className="text-center text-gray-600">Spam messages will appear here.</div>}
