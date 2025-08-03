@@ -123,7 +123,7 @@ export default function Layout({
           </button>
 
           {/* Sent Button */}
-          {labelSettings?.sent === 'show' && (
+          {userSettings?.label_sent_visibility === 'show' && (
           <button
             onClick={() => handleTabChangeAndCloseSidebar("sent")}
             className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -157,7 +157,7 @@ export default function Layout({
           {showMoreOptions && (
             <div className="flex flex-col gap-3 pl-4"> {/* Indent these options */}
               {/* Starred Button */}
-              {labelSettings?.starred === 'show' && (
+              {userSettings?.label_starred_visibility === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("starred")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -173,7 +173,7 @@ export default function Layout({
               </button>)}
 
               {/* Drafts Button */}
-              {labelSettings?.drafts === 'show' && (
+              {userSettings?.label_drafts_visibility === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("drafts")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -189,7 +189,7 @@ export default function Layout({
               </button>)}
 
               {/* Scheduled Button */}
-              {labelSettings?.scheduled === 'show' && (
+              {userSettings?.label_scheduled_visibility === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("scheduled")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -205,7 +205,7 @@ export default function Layout({
               </button>)}
 
               {/* Spam Button */}
-              {labelSettings?.spam === 'show' && (
+              {userSettings?.label_spam_visibility === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("spam")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
@@ -221,7 +221,7 @@ export default function Layout({
               </button>)}
 
               {/* Trash Button */}
-              {labelSettings?.trash === 'show' && (
+              {userSettings?.label_trash_visibility === 'show' && (
               <button
                 onClick={() => handleTabChangeAndCloseSidebar("trash")}
                 className={`px-4 py-2 text-left rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 ${

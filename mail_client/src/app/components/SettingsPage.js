@@ -15,8 +15,8 @@ export default function SettingsPage({ initialSettings, onSave, appMessage, onSi
   const settingsCategories = [
     { name: 'General', label: 'General', disabled: false },
     { name: 'Labels', label: 'Labels', disabled: false },
-    { name: 'AccountsAndImport', label: 'Accounts and Import', disabled: false },
-    { name: 'FiltersAndBlockedAddresses', label: 'Filters and Blocked', disabled: true },
+    { name: 'AccountsAndImport', label: 'Accounts', disabled: false },
+    { name: 'FiltersAndBlockedAddresses', label: 'Blocked', disabled: true },
   ];
 
   return (

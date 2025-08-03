@@ -32,6 +32,7 @@ const LabelSettingRow = ({ labelName, status, onStatusChange }) => {
 export default function LabelsSettings({ labelSettings, onLabelSettingsChange }) {
   
   const handleSettingChange = (labelKey, newStatus) => {
+    // This function now calls a new onSave function to trigger a backend save
     onLabelSettingsChange({
       ...labelSettings,
       [labelKey]: newStatus,
@@ -46,33 +47,33 @@ export default function LabelsSettings({ labelSettings, onLabelSettingsChange })
       <div className="bg-white rounded-md border border-gray-200 px-4">
         <LabelSettingRow
           labelName="Starred"
-          status={labelSettings?.starred || 'show'}
-          onStatusChange={(status) => handleSettingChange('starred', status)}
-        />
-        <LabelSettingRow
-          labelName="Spam"
-          status={labelSettings?.spam || 'show'}
-          onStatusChange={(status) => handleSettingChange('spam', status)}
-        />
-        <LabelSettingRow
-          labelName="Scheduled"
-          status={labelSettings?.scheduled || 'show'}
-          onStatusChange={(status) => handleSettingChange('scheduled', status)}
-        />
-        <LabelSettingRow
-          labelName="Drafts"
-          status={labelSettings?.drafts || 'show'}
-          onStatusChange={(status) => handleSettingChange('drafts', status)}
+          status={labelSettings?.label_starred_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_starred_visibility', status)}
         />
         <LabelSettingRow
           labelName="Sent"
-          status={labelSettings?.sent || 'show'}
-          onStatusChange={(status) => handleSettingChange('sent', status)}
+          status={labelSettings?.label_sent_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_sent_visibility', status)}
         />
-         <LabelSettingRow
+        <LabelSettingRow
+          labelName="Drafts"
+          status={labelSettings?.label_drafts_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_drafts_visibility', status)}
+        />
+        <LabelSettingRow
+          labelName="Scheduled"
+          status={labelSettings?.label_scheduled_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_scheduled_visibility', status)}
+        />
+        <LabelSettingRow
+          labelName="Spam"
+          status={labelSettings?.label_spam_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_spam_visibility', status)}
+        />
+        <LabelSettingRow
           labelName="Trash"
-          status={labelSettings?.trash || 'show'}
-          onStatusChange={(status) => handleSettingChange('trash', status)}
+          status={labelSettings?.label_trash_visibility || 'show'}
+          onStatusChange={(status) => handleSettingChange('label_trash_visibility', status)}
         />
       </div>
     </div>

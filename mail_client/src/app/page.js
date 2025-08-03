@@ -44,16 +44,6 @@ export default function Home() {
   // STATE FOR USER SETTINGS
   const [userSettings, setUserSettings] = useState(null);
 
-   // 1. Add new state for label visibility settings
-   const [labelSettings, setLabelSettings] = useState({
-    starred: 'show',
-    drafts: 'show',
-    sent: 'show',
-    trash: 'show',
-    spam: 'show',
-    scheduled: 'show',
-  });
-
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -200,11 +190,24 @@ export default function Home() {
   };
 
   // 2. Add new handler to update the label settings state
-  const handleLabelSettingsChange = (newSettings) => {
-    setLabelSettings(newSettings);
-    // In a real app, you would also save this to the backend here.
-    // For now, we just update the local state.
-    setAppMessage('Label visibility updated!');
+  const handleLabelSettingsChange = async (newLabelSettings) => {
+    try {
+      // Optimistically update the UI first for a snappy experience
+      setUserSettings(prev => ({ ...prev, ...newLabelSettings }));
+
+      // Call the existing endpoint to update the settings
+      const res = await apiClient.patch('/api/settings/general', newLabelSettings);
+      
+      // Update state with the confirmed settings from the backend response
+      setUserSettings(res.data.settings);
+      setAppMessage('Label visibility updated!');
+
+    } catch (err) {
+      console.error('Failed to save label settings:', err);
+      setAppMessage('Could not save label visibility settings.');
+      // Optional: Revert optimistic update on error
+      fetchUserSettings();
+    }
   };
 
   const handleChangePassword = async (oldPassword, newPassword) => {
@@ -498,7 +501,7 @@ export default function Home() {
       sentCount={sentEmails.length}
       onMinimizeCompose={handleMinimizeCompose}
       userSettings={userSettings}
-      labelSettings={labelSettings} 
+     
     >
       {/* Hide app message on settings tab since SettingsPage has its own message display */}
       {appMessage && activeTab !== 'settings' && <p className="mb-4 text-center text-green-600">{appMessage}</p>}
@@ -576,7 +579,7 @@ export default function Home() {
             onSave={handleSaveSettings}
             appMessage={appMessage}
             onSignatureAction={handleSignatureAction}
-            labelSettings={labelSettings}
+            labelSettings={userSettings}
             onLabelSettingsChange={handleLabelSettingsChange}
             onChangePassword={handleChangePassword} 
         />
